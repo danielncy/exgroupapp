@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { supabase, createBooking } from "@ex-group/db";
-import { Card, Button, Input, Badge } from "@ex-group/ui";
+import { supabase, createBooking, getWalletBalance, payWithWallet } from "@ex-group/db";
+import { Card, Button, Badge } from "@ex-group/ui";
 import type { Outlet, Service } from "@ex-group/shared/types/outlet";
+
+type PaymentOption = "wallet" | "pay_later";
 
 function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)} SGD`;
@@ -48,6 +50,12 @@ export default function ConfirmBookingPage() {
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
 
+  // Wallet payment state
+  const [paymentMethod, setPaymentMethod] = useState<PaymentOption>("pay_later");
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [paidWithWallet, setPaidWithWallet] = useState(false);
+
   useEffect(() => {
     async function fetchMeta() {
       setLoading(true);
@@ -76,11 +84,32 @@ export default function ConfirmBookingPage() {
     void fetchMeta();
   }, [outletId, serviceId]);
 
+  // Load wallet balance
+  useEffect(() => {
+    async function loadWallet() {
+      setWalletLoading(true);
+      try {
+        const bal = await getWalletBalance();
+        setWalletBalance(bal);
+      } catch {
+        // Wallet not available — that's ok, user can still pay later
+        setWalletBalance(0);
+      } finally {
+        setWalletLoading(false);
+      }
+    }
+    void loadWallet();
+  }, []);
+
+  const canPayWithWallet =
+    service !== null && walletBalance >= service.price_cents;
+
   async function handleConfirm() {
     setSubmitting(true);
     setError(null);
 
     try {
+      // 1. Create the booking
       const booking = await createBooking({
         outlet_id: outletId,
         service_id: serviceId,
@@ -89,6 +118,23 @@ export default function ConfirmBookingPage() {
         stylist_id: stylistId || undefined,
         notes: notes.trim() || undefined,
       });
+
+      // 2. If paying with wallet, deduct now
+      if (paymentMethod === "wallet" && service) {
+        try {
+          await payWithWallet(booking.id, service.price_cents, outletId);
+          setPaidWithWallet(true);
+        } catch (payErr) {
+          // Booking was created but payment failed — inform user
+          setError(
+            `Booking created, but wallet payment failed: ${
+              payErr instanceof Error ? payErr.message : "Unknown error"
+            }. You can pay at the outlet instead.`
+          );
+          setBookingId(booking.id);
+          return;
+        }
+      }
 
       setBookingId(booking.id);
     } catch (err) {
@@ -125,6 +171,12 @@ export default function ConfirmBookingPage() {
             <p className="text-sm text-gray-500">
               Your booking has been created successfully.
             </p>
+            {paidWithWallet && (
+              <Badge variant="success">Paid with Wallet</Badge>
+            )}
+            {!paidWithWallet && paymentMethod === "pay_later" && (
+              <Badge variant="default">Pay at Outlet</Badge>
+            )}
             <div className="rounded-lg bg-gray-50 px-4 py-2">
               <p className="text-xs text-gray-400">Booking ID</p>
               <p className="font-mono text-sm text-gray-700">{bookingId}</p>
@@ -205,7 +257,7 @@ export default function ConfirmBookingPage() {
                 Outlet
               </p>
               <p className="mt-1 text-sm font-medium text-gray-900">
-                {outlet?.name ?? "—"}
+                {outlet?.name ?? "\u2014"}
               </p>
             </div>
             <div>
@@ -213,7 +265,7 @@ export default function ConfirmBookingPage() {
                 Service
               </p>
               <p className="mt-1 text-sm font-medium text-gray-900">
-                {service?.name ?? "—"}
+                {service?.name ?? "\u2014"}
               </p>
             </div>
             <div>
@@ -245,7 +297,7 @@ export default function ConfirmBookingPage() {
                 Duration
               </p>
               <p className="mt-1 text-sm font-medium text-gray-900">
-                {service?.duration_minutes ?? "—"} min
+                {service?.duration_minutes ?? "\u2014"} min
               </p>
             </div>
           </div>
@@ -254,10 +306,94 @@ export default function ConfirmBookingPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Total</p>
               <p className="text-xl font-bold text-gray-900">
-                {service ? formatPrice(service.price_cents) : "—"}
+                {service ? formatPrice(service.price_cents) : "\u2014"}
               </p>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* Payment Method */}
+      <Card>
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-gray-900">Payment Method</h3>
+
+          {/* Pay with Wallet */}
+          <button
+            type="button"
+            onClick={() => {
+              if (canPayWithWallet) {
+                setPaymentMethod("wallet");
+              }
+            }}
+            className={`flex w-full items-center gap-3 rounded-lg border-2 p-4 text-left transition-colors ${
+              paymentMethod === "wallet"
+                ? "border-gray-900 bg-gray-50"
+                : "border-gray-200 hover:border-gray-300"
+            } ${!canPayWithWallet ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+          >
+            <div
+              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                paymentMethod === "wallet"
+                  ? "border-gray-900"
+                  : "border-gray-300"
+              }`}
+            >
+              {paymentMethod === "wallet" && (
+                <div className="h-2.5 w-2.5 rounded-full bg-gray-900" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                Pay with Wallet
+              </p>
+              <p className="text-xs text-gray-500">
+                {walletLoading
+                  ? "Loading balance..."
+                  : `Balance: $${(walletBalance / 100).toFixed(2)} SGD`}
+              </p>
+              {!canPayWithWallet && !walletLoading && service && (
+                <p className="mt-1 text-xs text-red-500">
+                  Insufficient balance. Top up{" "}
+                  <Link href="/wallet" className="underline">
+                    here
+                  </Link>
+                  .
+                </p>
+              )}
+            </div>
+          </button>
+
+          {/* Pay Later */}
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("pay_later")}
+            className={`flex w-full items-center gap-3 rounded-lg border-2 p-4 text-left transition-colors ${
+              paymentMethod === "pay_later"
+                ? "border-gray-900 bg-gray-50"
+                : "border-gray-200 hover:border-gray-300"
+            } cursor-pointer`}
+          >
+            <div
+              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                paymentMethod === "pay_later"
+                  ? "border-gray-900"
+                  : "border-gray-300"
+              }`}
+            >
+              {paymentMethod === "pay_later" && (
+                <div className="h-2.5 w-2.5 rounded-full bg-gray-900" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                Pay Later (at outlet)
+              </p>
+              <p className="text-xs text-gray-500">
+                Pay with cash or card when you arrive
+              </p>
+            </div>
+          </button>
         </div>
       </Card>
 
@@ -299,7 +435,9 @@ export default function ConfirmBookingPage() {
           loading={submitting}
           onClick={() => void handleConfirm()}
         >
-          Confirm Booking
+          {paymentMethod === "wallet"
+            ? `Pay ${service ? formatPrice(service.price_cents) : ""} & Confirm`
+            : "Confirm Booking"}
         </Button>
       </div>
     </div>

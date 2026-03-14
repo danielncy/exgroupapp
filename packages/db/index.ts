@@ -26,6 +26,20 @@ export type {
   BookingWithDetails,
 } from "./supabase/bookings";
 export {
+  getAdminBookings,
+  updateBookingStatus,
+  getAdminOutlets,
+  getAdminStats,
+  getAdminCustomers,
+} from "./supabase/admin";
+export type {
+  AdminBooking,
+  AdminBookingFilters,
+  AdminStats,
+  AdminCustomerRow,
+  AdminOutletRow,
+} from "./supabase/admin";
+export {
   getMyMemberships,
   getMyStampCards,
   getMyLoyaltyHistory,
@@ -36,3 +50,17 @@ export type {
   MembershipWithBrand,
   StampCardWithBrand,
 } from "./supabase/loyalty";
+export {
+  getOrCreateWallet,
+  getWalletBalance,
+  getWalletHistory,
+  topUpWallet,
+  payWithWallet,
+  getPackages,
+  getMyPackages,
+  purchasePackage,
+} from "./supabase/wallet";
+export type {
+  PackageWithDetails,
+  CustomerPackageWithDetails,
+} from "./supabase/wallet";
