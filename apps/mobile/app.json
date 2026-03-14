@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "EX Group",
+    "slug": "ex-group",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "exgroup",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.exgroup.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.exgroup.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1A2E"
+      }
+    },
+    "plugins": ["expo-router"]
+  }
+}

@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default brand: EX Style */
+  --brand-primary: #1a1a2e;
+  --brand-accent: #e94560;
+  --brand-surface: #fafafa;
+}
+
+[data-brand="ex_beauty"] {
+  --brand-primary: #2d1b69;
+  --brand-accent: #ff6b9d;
+  --brand-surface: #fff9fb;
+}
+
+[data-brand="uhair"] {
+  --brand-primary: #0d3b66;
+  --brand-accent: #faa307;
+  --brand-surface: #fffcf2;
+}
+
+[data-brand="coulisse"] {
+  --brand-primary: #1b4332;
+  --brand-accent: #95d5b2;
+  --brand-surface: #f8fff9;
+}
