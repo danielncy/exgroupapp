@@ -2,8 +2,8 @@
   "name": "@ex-group/db",
   "version": "0.1.0",
   "private": true,
-  "main": "./supabase/client.ts",
-  "types": "./supabase/client.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no lint configured'"
