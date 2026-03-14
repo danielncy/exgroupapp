@@ -25,3 +25,14 @@ export type {
   AvailableSlotsResponse,
   BookingWithDetails,
 } from "./supabase/bookings";
+export {
+  getMyMemberships,
+  getMyStampCards,
+  getMyLoyaltyHistory,
+  getRewards,
+  getLoyaltyTiers,
+} from "./supabase/loyalty";
+export type {
+  MembershipWithBrand,
+  StampCardWithBrand,
+} from "./supabase/loyalty";

@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { useRouter } from "expo-router";
 import { brandTokens } from "@ex-group/ui/tokens/brands";
 
 const brand = brandTokens.ex_style;
@@ -7,15 +8,18 @@ interface QuickAction {
   title: string;
   description: string;
   icon: string;
+  route: string | null;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { title: "Book", description: "Schedule appointment", icon: "\uD83D\uDCC5" },
-  { title: "Top Up", description: "Add wallet funds", icon: "\uD83D\uDCB3" },
-  { title: "Rewards", description: "View your stamps", icon: "\uD83C\uDFC6" },
+  { title: "Book", description: "Schedule appointment", icon: "\uD83D\uDCC5", route: "/book" },
+  { title: "Top Up", description: "Add wallet funds", icon: "\uD83D\uDCB3", route: null },
+  { title: "Rewards", description: "View your stamps", icon: "\uD83C\uDFC6", route: null },
 ];
 
 export default function HomeTab() {
+  const router = useRouter();
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Welcome section */}
@@ -31,7 +35,16 @@ export default function HomeTab() {
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
           {QUICK_ACTIONS.map((action) => (
-            <TouchableOpacity key={action.title} style={styles.actionCard} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={action.title}
+              style={styles.actionCard}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (action.route != null) {
+                  router.push(action.route as never);
+                }
+              }}
+            >
               <Text style={styles.actionIcon}>{action.icon}</Text>
               <Text style={styles.actionTitle}>{action.title}</Text>
               <Text style={styles.actionDescription}>{action.description}</Text>
@@ -47,7 +60,11 @@ export default function HomeTab() {
           <Text style={styles.emptyIcon}>{"\uD83D\uDCC5"}</Text>
           <Text style={styles.emptyText}>No upcoming bookings</Text>
           <Text style={styles.emptySubtext}>Book your next appointment to get started.</Text>
-          <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            activeOpacity={0.8}
+            onPress={() => router.push("/book" as never)}
+          >
             <Text style={styles.primaryButtonText}>Book Now</Text>
           </TouchableOpacity>
         </View>
