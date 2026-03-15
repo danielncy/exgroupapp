@@ -39,8 +39,32 @@ export interface LoyaltyTier {
   brand_id: string;
   tier_name: string;
   min_points: number;
-  benefits: Record<string, unknown>;
+  benefits: TierBenefits;
   created_at: string;
+}
+
+export interface TierBenefits {
+  discount_pct: number;
+  points_multiplier: number;
+  priority_booking?: boolean;
+  birthday_bonus_multiplier: number;
+  free_birthday_service?: boolean;
+}
+
+export interface TierProgress {
+  currentTier: LoyaltyTier;
+  nextTier: LoyaltyTier | null;
+  totalPoints: number;
+  pointsToNextTier: number;
+  progressPercent: number;
+}
+
+export interface StreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  lastVisitAt: string | null;
+  nextMilestone: number | null;
+  nextMilestonePoints: number | null;
 }
 
 export interface Reward {
@@ -51,6 +75,29 @@ export interface Reward {
   points_cost: number;
   stamps_cost: number;
   reward_type: "discount" | "free_service" | "product" | "upgrade";
+  min_tier: string;
   is_active: boolean;
   created_at: string;
+}
+
+export interface RewardRedemption {
+  id: string;
+  customer_id: string;
+  reward_id: string;
+  brand_id: string;
+  points_spent: number;
+  status: "pending" | "used" | "expired";
+  redeemed_at: string;
+  expires_at: string;
+  reward?: Reward;
+}
+
+export interface CustomerRiskEvent {
+  id: string;
+  customer_id: string;
+  brand_id: string;
+  from_level: string;
+  to_level: string;
+  detected_at: string;
+  customer?: { display_name: string };
 }

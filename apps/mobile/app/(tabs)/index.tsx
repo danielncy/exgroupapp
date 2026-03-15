@@ -132,6 +132,7 @@ export default function HomeTab() {
             { title: "Book", icon: "📅", route: "/book" },
             { title: "Top Up", icon: "💳", route: "/(tabs)/wallet" },
             { title: "Rewards", icon: "🏆", route: "/(tabs)/loyalty" },
+            { title: "Refer", icon: "🤝", route: "/referral" },
           ].map((action) => (
             <TouchableOpacity
               key={action.title}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { calculateHealthScores, getHealthScores } from "@ex-group/db";
-import type { HealthScore } from "@ex-group/db";
+import Link from "next/link";
+import { calculateHealthScores, getHealthScores, getRiskTransitions } from "@ex-group/db";
+import type { HealthScore, RiskTransition } from "@ex-group/db";
 
 const RISK_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   healthy: { bg: "bg-green-100", text: "text-green-700", label: "Healthy" },
@@ -14,6 +15,7 @@ const RISK_COLORS: Record<string, { bg: string; text: string; label: string }> =
 
 export default function CRMPage() {
   const [scores, setScores] = useState<HealthScore[]>([]);
+  const [riskChanges, setRiskChanges] = useState<RiskTransition[]>([]);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
   const [filterRisk, setFilterRisk] = useState<string>("");
@@ -21,11 +23,15 @@ export default function CRMPage() {
 
   const loadScores = useCallback(async () => {
     try {
-      const data = await getHealthScores({
-        risk_level: filterRisk || undefined,
-        limit: 100,
-      });
+      const [data, transitions] = await Promise.all([
+        getHealthScores({
+          risk_level: filterRisk || undefined,
+          limit: 100,
+        }),
+        getRiskTransitions(undefined, 10),
+      ]);
       setScores(data);
+      setRiskChanges(transitions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scores");
     } finally {
@@ -116,6 +122,62 @@ export default function CRMPage() {
           </button>
         ))}
       </div>
+
+      {/* Recent risk changes */}
+      {riskChanges.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Recent Risk Changes
+            </h2>
+            <Link
+              href="/admin/crm/alerts"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              View all alerts →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {riskChanges.map((t) => {
+              const fromStyle = RISK_COLORS[t.from_level] ?? { bg: "bg-gray-100", text: "text-gray-700", label: t.from_level };
+              const toStyle = RISK_COLORS[t.to_level] ?? { bg: "bg-gray-100", text: "text-gray-700", label: t.to_level };
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm font-medium text-slate-900">
+                      {t.customer?.display_name ?? "Customer"}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-medium ${fromStyle.bg} ${fromStyle.text}`}
+                      >
+                        {fromStyle.label}
+                      </span>
+                      <span className="text-slate-400">→</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-medium ${toStyle.bg} ${toStyle.text}`}
+                      >
+                        {toStyle.label}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {new Date(t.detected_at).toLocaleDateString("en-SG", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Customer table */}
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">

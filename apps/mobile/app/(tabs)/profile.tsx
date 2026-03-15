@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { brandTokens } from "@ex-group/ui/tokens/brands";
-import { signOut, useUser } from "@ex-group/db";
+import { signOut, useUser, updateDateOfBirth, supabase } from "@ex-group/db";
 
 const brand = brandTokens.ex_style;
 
@@ -10,6 +10,34 @@ export default function ProfileTab() {
   const router = useRouter();
   const { user } = useUser();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [dob, setDob] = useState("");
+  const [dobSaving, setDobSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadDob() {
+      if (!user) return;
+      const { data } = await supabase
+        .from("customers")
+        .select("date_of_birth")
+        .eq("auth_user_id", user.id)
+        .single();
+      if (data?.date_of_birth) setDob(data.date_of_birth as string);
+    }
+    void loadDob();
+  }, [user]);
+
+  async function handleSaveDob() {
+    if (!dob) return;
+    setDobSaving(true);
+    try {
+      await updateDateOfBirth(dob);
+      Alert.alert("Saved", "Birthday saved successfully!");
+    } catch {
+      Alert.alert("Error", "Failed to save date of birth");
+    } finally {
+      setDobSaving(false);
+    }
+  }
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -48,6 +76,34 @@ export default function ProfileTab() {
                 })
               : "—"}
           </Text>
+        </View>
+      </View>
+
+      {/* Birthday */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Birthday</Text>
+        <Text style={styles.dobHint}>
+          Set your birthday to receive bonus loyalty points every year!
+        </Text>
+        <View style={styles.dobRow}>
+          <TextInput
+            style={styles.dobInput}
+            value={dob}
+            onChangeText={setDob}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9CA3AF"
+            keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
+          />
+          <TouchableOpacity
+            style={[styles.dobButton, (!dob || dobSaving) && styles.dobButtonDisabled]}
+            activeOpacity={0.7}
+            onPress={() => void handleSaveDob()}
+            disabled={dobSaving || !dob}
+          >
+            <Text style={styles.dobButtonText}>
+              {dobSaving ? "..." : "Save"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -113,6 +169,41 @@ const styles = StyleSheet.create({
   linkIcon: { fontSize: 18, marginRight: 12 },
   linkLabel: { flex: 1, fontSize: 15, color: "#374151" },
   linkArrow: { fontSize: 16, color: "#9CA3AF" },
+  dobHint: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  dobRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dobInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+  dobButton: {
+    backgroundColor: "#E94560",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
+  dobButtonDisabled: {
+    opacity: 0.5,
+  },
+  dobButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   logoutButton: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,

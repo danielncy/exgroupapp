@@ -46,11 +46,23 @@ export {
   getMyLoyaltyHistory,
   getRewards,
   getLoyaltyTiers,
+  getTierBenefits,
+  getMyTierProgress,
+  getMyStreakInfo,
+  redeemReward,
+  getMyRedemptions,
+  updateDateOfBirth,
 } from "./supabase/loyalty";
 export type {
   MembershipWithBrand,
   StampCardWithBrand,
 } from "./supabase/loyalty";
+export {
+  getMyReferralCode,
+  applyReferralCode,
+  getMyReferrals,
+  getMyReferralStats,
+} from "./supabase/referrals";
 export {
   getOrCreateWallet,
   getWalletBalance,
@@ -93,6 +105,8 @@ export {
   createCampaign,
   getCampaigns,
   getCampaignStats,
+  getRiskTransitions,
+  getChurnAlerts,
 } from "./supabase/crm";
 export type {
   HealthScore,
@@ -100,6 +114,7 @@ export type {
   Campaign,
   CampaignStats,
   CreateCampaignInput,
+  RiskTransition,
 } from "./supabase/crm";
 export {
   registerPushToken,

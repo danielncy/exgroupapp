@@ -7,11 +7,13 @@ import { createServiceClient } from "./client";
 export interface HealthScore {
   id: string;
   customer_id: string;
+  brand_id: string | null;
   score: number;
   recency_score: number;
   frequency_score: number;
   monetary_score: number;
   risk_level: "healthy" | "cooling" | "at_risk" | "churning" | "churned";
+  previous_risk_level: string | null;
   calculated_at: string;
   customer?: {
     id: string;
@@ -265,4 +267,82 @@ export async function getCampaignStats(
     clicked: events.filter((e) => e.event_type === "clicked").length,
     converted: events.filter((e) => e.event_type === "converted").length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// getRiskTransitions — recent risk level changes
+// ---------------------------------------------------------------------------
+
+export interface RiskTransition {
+  id: string;
+  customer_id: string;
+  brand_id: string;
+  from_level: string;
+  to_level: string;
+  detected_at: string;
+  customer?: { display_name: string };
+}
+
+export async function getRiskTransitions(
+  brandId?: string,
+  limit = 50
+): Promise<RiskTransition[]> {
+  const sb = getServiceSupabase();
+
+  let query = sb
+    .from("customer_risk_events")
+    .select(`
+      *,
+      customer:customers(display_name)
+    `)
+    .order("detected_at", { ascending: false })
+    .limit(limit);
+
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch risk transitions: ${error.message}`);
+  }
+
+  return (data ?? []).map((d: Record<string, unknown>) => ({
+    ...(d as unknown as RiskTransition),
+    customer: d.customer
+      ? { display_name: (d.customer as { display_name: string }).display_name }
+      : undefined,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getChurnAlerts — notifications of type churn alert
+// ---------------------------------------------------------------------------
+
+export async function getChurnAlerts(limit = 50) {
+  const sb = getServiceSupabase();
+
+  const { data, error } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("type", "general")
+    .not("data->alert_type", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to fetch churn alerts: ${error.message}`);
+  }
+
+  return (data ?? []) as Array<{
+    id: string;
+    customer_id: string;
+    type: string;
+    title: string;
+    body: string;
+    data: Record<string, unknown>;
+    is_read: boolean;
+    created_at: string;
+  }>;
 }

@@ -25,6 +25,14 @@ serve(async (req: Request) => {
     // Call the SQL function that handles reminder logic
     const { data, error } = await supabase.rpc("send_booking_reminders");
 
+    // Also run birthday rewards
+    const { data: birthdayCount, error: birthdayError } = await supabase.rpc("send_birthday_rewards");
+    if (birthdayError) {
+      console.error("Birthday rewards error:", birthdayError.message);
+    } else if (birthdayCount && birthdayCount > 0) {
+      console.log(`Sent ${birthdayCount} birthday reward(s)`);
+    }
+
     if (error) {
       throw new Error(`Failed to send reminders: ${error.message}`);
     }

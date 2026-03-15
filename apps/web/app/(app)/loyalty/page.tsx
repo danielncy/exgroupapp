@@ -7,12 +7,15 @@ import {
   getMyStampCards,
   getMyLoyaltyHistory,
   getRewards,
+  getMyStreakInfo,
+  redeemReward,
 } from "@ex-group/db";
 import type { MembershipWithBrand, StampCardWithBrand } from "@ex-group/db";
 import type {
   LoyaltyLedgerEntry,
   Reward,
   MembershipTier,
+  StreakInfo,
 } from "@ex-group/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -177,12 +180,35 @@ function HistoryItem({ entry }: { entry: LoyaltyLedgerEntry }) {
   );
 }
 
-function RewardCard({ reward }: { reward: Reward }) {
+function RewardCard({
+  reward,
+  currentPoints,
+  currentTier,
+  onRedeem,
+  isRedeeming,
+}: {
+  reward: Reward;
+  currentPoints: number;
+  currentTier: MembershipTier;
+  onRedeem: (reward: Reward) => void;
+  isRedeeming: boolean;
+}) {
+  const tierOrder: MembershipTier[] = ["bronze", "silver", "gold", "platinum"];
+  const canAfford = currentPoints >= reward.points_cost;
+  const meetsMinTier =
+    tierOrder.indexOf(currentTier) >= tierOrder.indexOf(reward.min_tier as MembershipTier);
+  const canRedeem = canAfford && meetsMinTier && reward.points_cost > 0;
+
   return (
     <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
       <div>
         <p className="font-medium text-gray-900">{reward.name}</p>
         <p className="mt-0.5 text-sm text-gray-500">{reward.description}</p>
+        {!meetsMinTier && (
+          <p className="mt-1 text-xs text-amber-600">
+            Requires {reward.min_tier} tier
+          </p>
+        )}
       </div>
       <div className="ml-4 text-right">
         {reward.points_cost > 0 && (
@@ -191,11 +217,58 @@ function RewardCard({ reward }: { reward: Reward }) {
         {reward.stamps_cost > 0 && (
           <p className="text-xs text-gray-500">{reward.stamps_cost} stamps</p>
         )}
-        <Badge variant="default" className="mt-1 capitalize">
-          {reward.reward_type.replace("_", " ")}
-        </Badge>
+        {reward.points_cost > 0 && (
+          <button
+            onClick={() => canRedeem && onRedeem(reward)}
+            disabled={!canRedeem || isRedeeming}
+            className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              canRedeem
+                ? "bg-brand-accent text-white hover:opacity-90"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {isRedeeming ? "..." : "Redeem"}
+          </button>
+        )}
       </div>
     </div>
+  );
+}
+
+function StreakSection({ streak: s }: { streak: StreakInfo }) {
+  const nextMilestone = STREAK_MILESTONES.find((m) => m.weeks > s.currentStreak);
+  return (
+    <Card>
+      <div className="flex items-center gap-3">
+        <span className="text-3xl">🔥</span>
+        <div className="flex-1">
+          <p className="font-semibold text-gray-900">
+            {s.currentStreak}-week streak
+          </p>
+          <p className="text-sm text-gray-500">
+            {nextMilestone
+              ? `${nextMilestone.weeks - s.currentStreak} more weeks for ${nextMilestone.points} pts bonus`
+              : "All milestones achieved!"}
+          </p>
+        </div>
+        <p className="text-sm text-gray-400">Best: {s.longestStreak}w</p>
+      </div>
+      <div className="mt-3 flex gap-2">
+        {STREAK_MILESTONES.map((m) => (
+          <div
+            key={m.weeks}
+            className={`flex-1 rounded-lg py-1.5 text-center text-xs ${
+              s.currentStreak >= m.weeks
+                ? "bg-orange-100 text-orange-700 font-medium"
+                : "bg-gray-100 text-gray-400"
+            }`}
+          >
+            {m.weeks}w
+            <div className="text-[10px]">{m.points}pts</div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -203,13 +276,22 @@ function RewardCard({ reward }: { reward: Reward }) {
 // Page
 // ---------------------------------------------------------------------------
 
+const STREAK_MILESTONES = [
+  { weeks: 4, points: 100 },
+  { weeks: 8, points: 250 },
+  { weeks: 12, points: 500 },
+  { weeks: 24, points: 1000 },
+];
+
 export default function LoyaltyPage() {
   const [memberships, setMemberships] = useState<MembershipWithBrand[]>([]);
   const [stampCards, setStampCards] = useState<StampCardWithBrand[]>([]);
   const [history, setHistory] = useState<LoyaltyLedgerEntry[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [streak, setStreak] = useState<StreakInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [redeeming, setRedeeming] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -226,10 +308,15 @@ export default function LoyaltyPage() {
       setStampCards(stampData);
       setHistory(historyData);
 
-      // Load rewards for first membership brand (if any)
+      // Load rewards + streak for first membership brand (if any)
       if (membershipData.length > 0 && membershipData[0]?.brand) {
-        const rewardData = await getRewards(membershipData[0].brand.id);
+        const brandId = membershipData[0].brand.id;
+        const [rewardData, streakData] = await Promise.all([
+          getRewards(brandId),
+          getMyStreakInfo(brandId),
+        ]);
         setRewards(rewardData);
+        setStreak(streakData);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load loyalty data";
@@ -238,6 +325,23 @@ export default function LoyaltyPage() {
       setLoading(false);
     }
   }, []);
+
+  async function handleRedeem(reward: Reward) {
+    if (!memberships[0]?.brand) return;
+    setRedeeming(reward.id);
+    try {
+      const result = await redeemReward(reward.id, memberships[0].brand.id);
+      if (result.success) {
+        await load();
+      } else {
+        alert(result.error ?? "Redemption failed");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Redemption failed");
+    } finally {
+      setRedeeming(null);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -358,6 +462,14 @@ export default function LoyaltyPage() {
         </section>
       )}
 
+      {/* Streak */}
+      {streak && streak.currentStreak > 0 && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Visit Streak</h2>
+          <StreakSection streak={streak} />
+        </section>
+      )}
+
       {/* Recent history */}
       <section>
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Recent Activity</h2>
@@ -380,7 +492,14 @@ export default function LoyaltyPage() {
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Available Rewards</h2>
           <div className="space-y-3">
             {rewards.map((reward) => (
-              <RewardCard key={reward.id} reward={reward} />
+              <RewardCard
+                key={reward.id}
+                reward={reward}
+                currentPoints={memberships[0]?.total_points ?? 0}
+                currentTier={memberships[0]?.membership_tier ?? "bronze"}
+                onRedeem={handleRedeem}
+                isRedeeming={redeeming === reward.id}
+              />
             ))}
           </div>
         </section>

@@ -25,10 +25,20 @@ export type {
 } from "./wallet";
 export type {
   LoyaltyLedgerEntry,
+  LoyaltyEntryType,
   StampCard,
   LoyaltyTier,
+  TierBenefits,
+  TierProgress,
+  StreakInfo,
   Reward,
+  RewardRedemption,
+  CustomerRiskEvent,
 } from "./loyalty";
+export type {
+  Referral,
+  ReferralStats,
+} from "./referral";
 export type {
   AdminUser,
   AdminRole,
