@@ -115,11 +115,18 @@ export default function WalletTab() {
 
     setTopUpLoading(true);
     try {
-      await topUpWallet(amount);
+      const { checkoutUrl } = await topUpWallet(amount);
       setShowTopUp(false);
       setCustomAmount("");
-      await loadData();
-      Alert.alert("Success", `Wallet topped up with ${formatPrice(amount)}`);
+      // Open Stripe Checkout in browser
+      const WebBrowser = await import("expo-web-browser");
+      const result = await WebBrowser.openBrowserAsync(checkoutUrl);
+      if (result.type === "cancel" || result.type === "dismiss") {
+        // User closed the browser — reload wallet in case payment completed
+        await loadData();
+      } else {
+        await loadData();
+      }
     } catch (err) {
       Alert.alert(
         "Top-up Failed",

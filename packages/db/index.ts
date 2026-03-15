@@ -7,7 +7,7 @@ export {
   onAuthStateChange,
 } from "./supabase/auth";
 export type { AuthChangeEvent, AuthSession, Session, User } from "./supabase/auth";
-export { useSession, useUser } from "./supabase/hooks";
+export { useSession, useUser, useBrandDetection } from "./supabase/hooks";
 export {
   adminSignIn,
   adminSignOut,
@@ -31,6 +31,7 @@ export {
   getAdminOutlets,
   getAdminStats,
   getAdminCustomers,
+  getAdminReviews,
 } from "./supabase/admin";
 export type {
   AdminBooking,
@@ -55,6 +56,7 @@ export {
   getWalletBalance,
   getWalletHistory,
   topUpWallet,
+  getCheckoutSessionStatus,
   payWithWallet,
   getPackages,
   getMyPackages,
@@ -64,3 +66,42 @@ export type {
   PackageWithDetails,
   CustomerPackageWithDetails,
 } from "./supabase/wallet";
+export {
+  getMyNotifications,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+  subscribeToNotifications,
+  unsubscribeNotifications,
+} from "./supabase/notifications";
+export type { RealtimeNotification } from "./supabase/notifications";
+export {
+  submitReview,
+  getReviewForBooking,
+  getOutletReviews,
+  getStylistReviews,
+} from "./supabase/reviews";
+export {
+  getBrands,
+  getCustomerPrimaryBrand,
+} from "./supabase/brand";
+export {
+  calculateHealthScores,
+  getHealthScores,
+  getSegments,
+  getSegmentMembers,
+  createCampaign,
+  getCampaigns,
+  getCampaignStats,
+} from "./supabase/crm";
+export type {
+  HealthScore,
+  Segment,
+  Campaign,
+  CampaignStats,
+  CreateCampaignInput,
+} from "./supabase/crm";
+export {
+  registerPushToken,
+  deactivatePushToken,
+} from "./supabase/push";

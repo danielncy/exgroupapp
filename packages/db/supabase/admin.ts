@@ -2,6 +2,7 @@ import { createServiceClient } from "./client";
 import { getAdminUser } from "./admin-auth";
 import type { AdminUser } from "@ex-group/shared/types/admin";
 import type { BookingStatus } from "@ex-group/shared/types/booking";
+import type { ReviewWithDetails } from "@ex-group/shared/types/review";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -377,4 +378,46 @@ export async function getAdminCustomers(
   }
 
   return (data ?? []) as unknown as AdminCustomerRow[];
+}
+
+// ---------------------------------------------------------------------------
+// getAdminReviews — list reviews (admin scoped by outlet access)
+// ---------------------------------------------------------------------------
+
+export async function getAdminReviews(
+  filters?: { outletId?: string; limit?: number }
+): Promise<ReviewWithDetails[]> {
+  const admin = await getAdminUser();
+  if (!admin) throw new Error("Not authenticated as admin");
+
+  const sb = getServiceSupabase();
+  const outletIds = await getOutletIdsForAdmin(admin);
+  const limit = filters?.limit ?? 100;
+
+  let query = sb
+    .from("reviews")
+    .select(`
+      *,
+      customer:customers(id, display_name, avatar_url),
+      outlet:outlets(id, name),
+      stylist:stylists(id, name),
+      booking:bookings(id, booking_date, service:services(id, name))
+    `)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (filters?.outletId) {
+    query = query.eq("outlet_id", filters.outletId);
+  } else if (outletIds !== null) {
+    if (outletIds.length === 0) return [];
+    query = query.in("outlet_id", outletIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch admin reviews: ${error.message}`);
+  }
+
+  return (data ?? []) as unknown as ReviewWithDetails[];
 }

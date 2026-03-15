@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandProvider, useBrand, Avatar } from "@ex-group/ui";
+import {
+  getUnreadCount,
+  useBrandDetection,
+  subscribeToNotifications,
+  unsubscribeNotifications,
+} from "@ex-group/db";
 
 interface NavItem {
   label: string;
@@ -16,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Bookings", href: "/bookings", icon: "\uD83D\uDCC5" },
   { label: "Wallet", href: "/wallet", icon: "\uD83D\uDCB3" },
   { label: "Loyalty", href: "/loyalty", icon: "\u2B50" },
+  { label: "Notifications", href: "/notifications", icon: "\uD83D\uDD14" },
   { label: "Profile", href: "/profile", icon: "\uD83D\uDC64" },
 ];
 
@@ -95,6 +102,36 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   );
 }
 
+function NotificationBell() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    // Initial load
+    getUnreadCount().then(setCount).catch(() => setCount(0));
+
+    // Subscribe to realtime notifications
+    subscribeToNotifications(() => {
+      // Increment count on any new notification
+      setCount((prev) => prev + 1);
+    });
+
+    return () => {
+      void unsubscribeNotifications();
+    };
+  }, []);
+
+  return (
+    <Link href="/notifications" className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100">
+      <span className="text-lg">{"\uD83D\uDD14"}</span>
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
@@ -107,7 +144,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile header */}
-        <header className="flex items-center border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
           <button
             onClick={() => setSidebarCollapsed(false)}
             className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
@@ -117,6 +154,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          <NotificationBell />
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
@@ -126,8 +164,18 @@ function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { brandId, loading } = useBrandDetection();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900" />
+      </div>
+    );
+  }
+
   return (
-    <BrandProvider brandId="ex_style">
+    <BrandProvider brandId={brandId}>
       <AppShell>{children}</AppShell>
     </BrandProvider>
   );

@@ -137,36 +137,55 @@ export async function getWalletHistory(
 }
 
 // ---------------------------------------------------------------------------
-// topUpWallet — insert a 'topup' ledger entry (simulated — no Stripe)
+// topUpWallet — create a Stripe Checkout Session for wallet top-up
+// Returns checkout URL for redirect. Wallet is credited via webhook only.
 // ---------------------------------------------------------------------------
 
-export async function topUpWallet(amountCents: number): Promise<WalletLedgerEntry> {
+export async function topUpWallet(
+  amountCents: number
+): Promise<{ checkoutUrl: string }> {
   if (amountCents <= 0) {
     throw new Error("Top-up amount must be positive");
   }
 
-  const wallet = await getOrCreateWallet();
-  const idempotencyKey = `topup-${generateIdempotencyKey()}`;
+  // Ensure wallet exists
+  await getOrCreateWallet();
 
-  const { data: entry, error } = await supabase
-    .from("wallet_ledger")
-    .insert({
-      wallet_id: wallet.id,
-      entry_type: "topup",
-      amount_cents: amountCents,
-      currency: "SGD",
-      reference_type: "topup",
-      description: `Wallet top-up of $${(amountCents / 100).toFixed(2)}`,
-      idempotency_key: idempotencyKey,
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.functions.invoke(
+    "create-checkout-session",
+    {
+      body: { amount_cents: amountCents },
+    }
+  );
 
   if (error) {
-    throw new Error(`Failed to top up wallet: ${error.message}`);
+    throw new Error(`Failed to create checkout session: ${error.message}`);
   }
 
-  return entry as WalletLedgerEntry;
+  const result = data as { checkout_url: string; session_id: string };
+
+  if (!result.checkout_url) {
+    throw new Error("No checkout URL returned");
+  }
+
+  return { checkoutUrl: result.checkout_url };
+}
+
+// ---------------------------------------------------------------------------
+// getCheckoutSessionStatus — poll for checkout session completion
+// ---------------------------------------------------------------------------
+
+export async function getCheckoutSessionStatus(
+  sessionId: string
+): Promise<"pending" | "completed" | "expired"> {
+  const { data, error } = await supabase
+    .from("stripe_checkout_sessions")
+    .select("status")
+    .eq("stripe_session_id", sessionId)
+    .single();
+
+  if (error || !data) return "pending";
+  return (data as { status: string }).status as "pending" | "completed" | "expired";
 }
 
 // ---------------------------------------------------------------------------

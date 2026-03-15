@@ -101,13 +101,11 @@ export default function WalletPage() {
     setTopUpLoading(true);
     setError(null);
     try {
-      await topUpWallet(amount);
-      setShowTopUpModal(false);
-      setCustomAmount("");
-      await loadData();
+      const { checkoutUrl } = await topUpWallet(amount);
+      // Redirect to Stripe Checkout
+      window.location.href = checkoutUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Top-up failed");
-    } finally {
       setTopUpLoading(false);
     }
   }
